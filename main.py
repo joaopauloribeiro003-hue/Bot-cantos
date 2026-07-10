@@ -12,9 +12,9 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "Robo de Elite Ativo (Cantos + Gols)", 200
+    return "Robo de Elite Ativo 24/7 (Cantos + Gols)", 200
 
-# --- CREDENCIAIS (Garante que colas a tua chave RapidAPI abaixo) ---
+# --- CREDENCIAIS ---
 TOKEN = "8372844203:AAGIdv0RRd7tToJDF63zl0XrwYqoZxFDWLE"
 CHAT_ID = "8562251804"
 RAPIDAPI_KEY = "ae97d1f708msh935be0cd1f463d3p17e894jsn1f6901368121" 
@@ -59,29 +59,25 @@ def pipeline_analise_elite():
         minuto = partida['fixture']['status']['elapsed']
         if not minuto or minuto > 90: continue
         
-        # 1. CONTROLO DE EVENTOS CRÍTICOS (Golos e Expulsões)
         gols_atuais = (partida['goals']['home'] or 0) + (partida['goals']['away'] or 0)
         stats = partida.get('statistics', [])
         if len(stats) < 2: continue
         
         vermelhos_atuais = extrair_stat(stats[0]['statistics'], 'Red Cards') + extrair_stat(stats[1]['statistics'], 'Red Cards')
         
-        # Regra do Reset Automático
         if id_j in ESTADO_GOLS and (gols_atuais > ESTADO_GOLS[id_j] or vermelhos_atuais > ESTADO_VERMELHOS[id_j]):
             ESTADO_GOLS[id_j] = gols_atuais
             ESTADO_VERMELHOS[id_j] = vermelhos_atuais
-            continue # Aborta a análise deste jogo na hora
+            continue 
             
         ESTADO_GOLS[id_j] = gols_atuais
         ESTADO_VERMELHOS[id_j] = vermelhos_atuais
 
-        # 2. EXTRAÇÃO DE MÉTRICAS DE ELITE
         atq_p = extrair_stat(stats[0]['statistics'], 'Dangerous Attacks') + extrair_stat(stats[1]['statistics'], 'Dangerous Attacks')
         chutes_alvo = extrair_stat(stats[0]['statistics'], 'Shots on Goal') + extrair_stat(stats[1]['statistics'], 'Shots on Goal')
         apm = atq_p / minuto if minuto > 0 else 0
         xg = round((chutes_alvo * 0.15) + (atq_p * 0.01), 2)
 
-        # Filtro de Valor Base
         if apm < 1.0: continue
 
         dif_elo = ELO_DB.get(home, 1500) - ELO_DB.get(away, 1500)
@@ -91,28 +87,24 @@ def pipeline_analise_elite():
         prob_matematica = 0
         assertividade = 0
 
-        # 3. JANELA 1º TEMPO (HT) - MINUTO 33' AO 36'
         if 33 <= minuto <= 36:
             assertividade = modelo_ml_ht.predict_proba(dados_atuais)[0][1] * 100
             prob_matematica = calcular_poisson((apm * 0.11) * (45 - minuto))
             
-            # Critério de Decisão Otimizado (Golo vs Canto)
             if xg >= 0.80 and chutes_alvo >= 3:
                 tipo_entrada = "⚽ OVER GOLO HT (Limite 0.5 Gols)"
             elif prob_matematica >= 63.0 and assertividade >= 65.0:
                 tipo_entrada = "📐 OVER CANTO HT (Limite 35')"
                 
-        # 4. JANELA 2º TEMPO (FT) - MINUTO 83' AO 87'
         elif 83 <= minuto <= 87:
             prob_matematica = calcular_poisson((apm * 0.12) * (90 - minuto))
-            assertividade = 78.5 # Heurística ML ajustada para final de jogo
+            assertividade = 78.5
             
             if xg >= 1.50 and chutes_alvo >= 6:
                 tipo_entrada = "🎯 PRESSURE OVER FT (Golos ou Cantos)"
             elif prob_matematica >= 65.0:
                 tipo_entrada = "🎯 OVER CANTO FT (Limite Final)"
 
-        # 5. DISPARO DO ALERTA OBJETIVO NO TELEGRAM
         if tipo_entrada:
             linhas = [
                 "🚨 <b>ENTRADA CONFIRMADA POR MULTI-IA</b>",
@@ -131,9 +123,11 @@ def pipeline_analise_elite():
 
 def rodar_loop():
     while True:
-        try: pipeline_analise_elite()
-        except: pass
-        time.sleep(120)
+        try:
+            pipeline_analise_elite()
+            time.sleep(120)  # Executa sem parar de 2 em 2 minutos, 24 horas por dia
+        except:
+            time.sleep(120)
 
 if __name__ == "__main__":
     threading.Thread(target=rodar_loop, daemon=True).start()
