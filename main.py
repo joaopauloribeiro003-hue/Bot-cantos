@@ -17,7 +17,7 @@ def home():
 # --- CREDENCIAIS CONFIGURADAS ---
 TOKEN = "8372844203:AAGIdv0RRd7tToJDF63zl0XrwYqoZxFDWLE"
 CHAT_ID = "8562251804"
-RAPIDAPI_KEY = "COLE_AQUI_SUA_CHAVE_RAPIDAPI" 
+RAPIDAPI_KEY = "ae97d1f708msh935be0cd1f463d3p17e894jsn1f6901368121" 
 
 # --- IA ---
 ELO_DB = {"Real Madrid": 1950, "Barcelona": 1880, "Flamengo": 1720, "Man City": 1980, "Liverpool": 1920}
